@@ -1,11 +1,49 @@
 import { describe, it, expect } from 'vitest';
-import { extractRootDomain, mergeRecord, recordsAreEqual } from '../src/utils/dns.js';
+import { zoneCandidates, resolveRecordType, mergeRecord, recordsAreEqual } from '../src/utils/dns.js';
 
-describe('extractRootDomain', () => {
-	it('returns root domain from full hostname', () => {
-		expect(extractRootDomain('home.example.com')).toBe('example.com');
-		expect(extractRootDomain('api.v1.dev.net')).toBe('dev.net');
-		expect(extractRootDomain('example.com')).toBe('example.com');
+describe('zoneCandidates', () => {
+	it('lists candidate zones from most to least specific', () => {
+		expect(zoneCandidates('home.example.com')).toEqual(['home.example.com', 'example.com']);
+		expect(zoneCandidates('api.v1.dev.net')).toEqual(['api.v1.dev.net', 'v1.dev.net', 'dev.net']);
+	});
+
+	it('includes the registrable domain for multi-part TLDs', () => {
+		expect(zoneCandidates('home.example.co.uk')).toEqual(['home.example.co.uk', 'example.co.uk', 'co.uk']);
+	});
+
+	it('handles an apex hostname', () => {
+		expect(zoneCandidates('example.com')).toEqual(['example.com']);
+	});
+
+	it('returns nothing for a single label', () => {
+		expect(zoneCandidates('localhost')).toEqual([]);
+	});
+});
+
+describe('resolveRecordType', () => {
+	it('infers A for IPv4 addresses', () => {
+		expect(resolveRecordType('1.2.3.4')).toBe('A');
+		expect(resolveRecordType('255.255.255.255')).toBe('A');
+	});
+
+	it('infers AAAA for IPv6 addresses', () => {
+		expect(resolveRecordType('2001:db8::1')).toBe('AAAA');
+		expect(resolveRecordType('::ffff:1.2.3.4')).toBe('AAAA');
+	});
+
+	it('uses an explicit type, case-insensitively', () => {
+		expect(resolveRecordType('target.example.net', 'CNAME')).toBe('CNAME');
+		expect(resolveRecordType('2001:db8::1', 'aaaa')).toBe('AAAA');
+	});
+
+	it('rejects unsupported types', () => {
+		expect(() => resolveRecordType('1.2.3.4', 'TXT')).toThrow('Unsupported record type: TXT');
+		expect(() => resolveRecordType('1.2.3.4', 'MX')).toThrow('Unsupported record type');
+	});
+
+	it('refuses to guess for content that is not an IP', () => {
+		expect(() => resolveRecordType('target.example.net')).toThrow(/Cannot infer record type/);
+		expect(() => resolveRecordType('999.1.1.1')).toThrow(/Cannot infer record type/);
 	});
 });
 

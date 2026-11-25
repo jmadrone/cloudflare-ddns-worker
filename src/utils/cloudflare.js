@@ -1,10 +1,25 @@
-export async function getZoneId(domain, token) {
-	const res = await cfApi(`zones?name=${domain}`, token);
+import { zoneCandidates } from './dns.js';
+
+export async function getZoneId(zoneName, token) {
+	const query = new URLSearchParams({ name: zoneName });
+	const res = await cfApi(`zones?${query}`, token);
 	return res.result?.[0]?.id || null;
 }
 
-export async function getDnsRecord(zoneId, hostname, token) {
-	const res = await cfApi(`zones/${zoneId}/dns_records?name=${hostname}`, token);
+/**
+ * Find the zone that owns a hostname by trying each candidate zone name, most specific first.
+ */
+export async function findZoneId(hostname, token) {
+	for (const candidate of zoneCandidates(hostname)) {
+		const zoneId = await getZoneId(candidate, token);
+		if (zoneId) return zoneId;
+	}
+	return null;
+}
+
+export async function getDnsRecord(zoneId, hostname, type, token) {
+	const query = new URLSearchParams({ name: hostname, type });
+	const res = await cfApi(`zones/${zoneId}/dns_records?${query}`, token);
 	return res.result?.[0] || null;
 }
 

@@ -53,6 +53,42 @@ describe('validateBasicAuth', () => {
 		const req = createRequestWithAuthHeader(`Basic ${creds}`);
 		expect(validateBasicAuth(req, env)).toBe(false);
 	});
+
+	it('rejects everything when BASIC_AUTH_PASS is not configured', () => {
+		const envNoPass = { BASIC_AUTH_USER: 'user' };
+		// Previously "user" (no colon) left pass undefined, which matched the unset secret.
+		expect(validateBasicAuth(createRequestWithAuthHeader(`Basic ${btoa('user')}`), envNoPass)).toBe(false);
+		expect(validateBasicAuth(createRequestWithAuthHeader(`Basic ${btoa('user:')}`), envNoPass)).toBe(false);
+		expect(validateBasicAuth(createRequestWithAuthHeader(`Basic ${btoa('user:anything')}`), envNoPass)).toBe(false);
+	});
+
+	it('rejects everything when BASIC_AUTH_USER is not configured', () => {
+		const envNoUser = { BASIC_AUTH_PASS: 'pass' };
+		expect(validateBasicAuth(createRequestWithAuthHeader(`Basic ${btoa(':pass')}`), envNoUser)).toBe(false);
+	});
+
+	it('accepts a password that contains colons', () => {
+		const envColon = { BASIC_AUTH_USER: 'user', BASIC_AUTH_PASS: 'a:b:c' };
+		const req = createRequestWithAuthHeader(`Basic ${btoa('user:a:b:c')}`);
+		expect(validateBasicAuth(req, envColon)).toBe(true);
+	});
+
+	it('treats everything after the first colon as the password', () => {
+		const req = createRequestWithAuthHeader(`Basic ${btoa('user:pass:extra')}`);
+		expect(validateBasicAuth(req, env)).toBe(false);
+	});
+
+	it('returns false when the password is a prefix of the real one', () => {
+		const req = createRequestWithAuthHeader(`Basic ${btoa('user:pas')}`);
+		expect(validateBasicAuth(req, env)).toBe(false);
+	});
+
+	it('accepts non-ASCII credentials encoded as UTF-8', () => {
+		const envUnicode = { BASIC_AUTH_USER: 'usér', BASIC_AUTH_PASS: 'pässwörd🔑' };
+		const bytes = new TextEncoder().encode('usér:pässwörd🔑');
+		const creds = btoa(String.fromCharCode(...bytes));
+		expect(validateBasicAuth(createRequestWithAuthHeader(`Basic ${creds}`), envUnicode)).toBe(true);
+	});
 });
 
 describe('unauthorizedResponse', () => {
