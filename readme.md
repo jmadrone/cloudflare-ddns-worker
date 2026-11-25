@@ -86,13 +86,17 @@ https://cloudflare-ddns-worker.YOURNAME.workers.dev/update
 
 ### Query Parameters
 
-| Parameter  | Description                            | Default    |
-| ---------- | -------------------------------------- | ---------- |
-| `hostname` | Fully-qualified domain name to update  | required   |
-| `ip`       | IP address to assign                   | required   |
-| `proxied`  | Whether to proxy via Cloudflare        | `true`     |
-| `ttl`      | Time-to-live (seconds)                 | `1` (auto) |
-| `type`     | DNS record type (`A`, `AAAA`, `CNAME`) | `A` if new |
+| Parameter  | Description                            | Default                                       |
+| ---------- | -------------------------------------- | --------------------------------------------- |
+| `hostname` | Fully-qualified domain name to update  | required                                      |
+| `ip`       | IP address to assign                   | required                                      |
+| `proxied`  | Whether to proxy via Cloudflare        | `true`                                        |
+| `ttl`      | Time-to-live (seconds)                 | `1` (auto)                                    |
+| `type`     | DNS record type (`A`, `AAAA`, `CNAME`) | inferred from `ip`: IPv4 → `A`, IPv6 → `AAAA` |
+
+Only the record matching `hostname` **and** `type` is touched, so a dual-stack host keeps separate `A` and `AAAA` records, and other records at the same name (e.g. `TXT`) are never modified. For a `CNAME`, pass the target hostname as `ip` and set `type=CNAME` explicitly.
+
+The zone is found automatically by trying the most specific parent first, so multi-part TLDs (`home.example.co.uk`) and delegated subdomain zones work.
 
 ---
 
